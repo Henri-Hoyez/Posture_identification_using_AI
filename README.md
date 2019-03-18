@@ -1,1 +1,1 @@
-# Poceturre_ydanttiphikassion_iouzihngue_AI
+# Posture_identification_using_AI
