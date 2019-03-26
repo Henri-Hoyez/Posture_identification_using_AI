@@ -78,11 +78,11 @@ opWrapper.start()
 
 
 # Load model
-json_file = open('model.json', 'r')
+json_file = open('./models/model.json', 'r')
 loaded_model_json = json_file.read()
 json_file.close()
 model = model_from_json(loaded_model_json)
-model.load_weights("model.h5")
+model.load_weights("./models/model.h5")
 
 font = cv2.FONT_HERSHEY_SIMPLEX
 
@@ -175,28 +175,28 @@ while(True):
 
     #Wait to press 'd' key for capturing data "standing"
     key = cv2.waitKey(33)
-    if key == ord('d'):
+    if key == ord('d') and isInDevMode:
         print("Press d")
         if not isSavingData:
             isSavingData = True
             mode = Pose.standing
 
     #Wait to press 'a' key for capturing data "sitting"
-    if key == ord('a'):
+    if key == ord('a') and isInDevMode:
         print("Press a")
         if not isSavingData:
             isSavingData = True
             mode = Pose.sitting
 
     #Wait to press 'c' key for capturing data "laying"
-    if key == ord('c'):
+    if key == ord('c') and isInDevMode:
         print("Press c")
         if not isSavingData:
             isSavingData = True
             mode = Pose.laying
 
     #Wait to press 's' key for stopping capturing data
-    if key == ord('s'):
+    if key == ord('s') and isInDevMode:
         print("Press s")
         isSavingData = False
         mode = Pose.unknown
