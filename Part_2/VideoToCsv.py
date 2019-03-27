@@ -87,86 +87,85 @@ opWrapper.configure(params)
 opWrapper.start()
 
 data = []
-FRAME_LENGHT = 10
-day =str(datetime.datetime.today().day)
-month = str(datetime.datetime.today().month)
-year = str(datetime.datetime.today().month)
-year = str(datetime.datetime.today().month)
-INPUT_PATH = "D:\\POSTURE\\openpose\\build\\examples\\tutorial_api_python\\Part_2\\Videos"          # Video inputs
-OUTPUT_PATH = "D:\\POSTURE\\openpose\\build\\examples\\tutorial_api_python\\Part_2"                 # Dataset output path
 DATASET_NAME = "dataset_"+datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
 
-
-
-test={}
-test["class_id"]=[]
-test["pts"]=[]
-TOTAL_FRAME_COUNT = 0
-count = 0
-
-
-files = []
-for (root, dirs, filenames) in os.walk(INPUT_PATH):
-    for file in filenames:
-        files.append(os.path.join(root,file))
-
-for f in files:
-    DATASET_FILE = open(DATASET_NAME+"_"+os.path.basename(f).replace(".","_")+".csv","a+")
-    dir_path = os.path.dirname(os.path.realpath(__file__))
-    f = os.path.relpath(f, os.path.commonprefix([f, dir_path]))
-    count += 1
-    vidcap = cv2.VideoCapture(f)
-    success,image = vidcap.read()
-    datum = op.Datum()
-    TOTAL_FRAME_COUNT = int(vidcap.get(cv2.CAP_PROP_FRAME_COUNT))
-    print("Video "+str(count)+"/"+str(len(files))+" : "+f)
-    pbar = tqdm(total=TOTAL_FRAME_COUNT)
-    success = True
-    while success:
+my_paths = dict()
+isFirst = True
+generated_path="./datasets_generated"
+for root, dirs, files in os.walk("./datasets_videos"):
+    if isFirst:
+        isFirst=False
+        continue
+    my_paths[root]=[]
+    for file in files:
         try:
-            success,image = vidcap.read()
-            datum.cvInputData = image
-            opWrapper.emplaceAndPop([datum])
+            os.makedirs(os.path.join(generated_path,os.path.basename(root)))
+        except:
+            pass
+        finally:
+            my_paths[root].append(file)
 
-            
-            pbar.update(1)
-            kp = datum.poseKeypoints
+id_class = dict()
+id_cum = 0
+for path in my_paths.keys():
+    class_data = os.path.basename(path)
+    if not class_data in id_class.keys():
+        id_class[class_data] = id_cum
+        id_cum += 1
 
-            normalized_keypoints = np.array(kp)
+    for file in my_paths[path]:
+        dataset_name = os.path.join(os.path.join(generated_path,os.path.basename(path)),"dataset_"+file.replace(".","_")+".csv")
+        DATASET_FILE = open(dataset_name,"w+")
+        dir_path = os.path.dirname(os.path.realpath(__file__))
+        f = os.path.join(path,file)
+        f = os.path.relpath(f, os.path.commonprefix([f, dir_path]))
+        vidcap = cv2.VideoCapture(f)
+        success,image = vidcap.read()
+        datum = op.Datum()
+        TOTAL_FRAME_COUNT = int(vidcap.get(cv2.CAP_PROP_FRAME_COUNT))
+        print("Video : "+f)
+        pbar = tqdm(total=TOTAL_FRAME_COUNT)
+        success = True
+        while success:
+            try:
+                success,image = vidcap.read()
+                datum.cvInputData = image
+                opWrapper.emplaceAndPop([datum])
 
-            if len(normalized_keypoints.shape) == 0:
-                continue
-            for index in range(normalized_keypoints.shape[0]):
-                #display
-                min_X = min(normalized_keypoints[index,:,0])
-                max_X = max(normalized_keypoints[index,:,0])
-                min_Y = min(normalized_keypoints[index,:,1])
-                max_Y = max(normalized_keypoints[index,:,1])
-                min_Z = min(normalized_keypoints[index,:,2])
-                max_Z = max(normalized_keypoints[index,:,2])
-                normalized_keypoints[index,:,0] = (normalized_keypoints[index,:,0]-min_X)/(max_X-min_X)
-                normalized_keypoints[index,:,1] = (normalized_keypoints[index,:,1]-min_Y)/(max_Y-min_Y)
-                normalized_keypoints[index,:,2] = (normalized_keypoints[index,:,2]-min_Z)/(max_Z-min_Z)
+                
+                pbar.update(1)
+                kp = datum.poseKeypoints
 
-                isDetected = (kp[index,11,:].sum() != 0)
-                isDetected = (isDetected and (kp[index,14,:].sum() != 0))
-                isDetected = (isDetected and (kp[index,8,:].sum() != 0))
-                isDetected = (isDetected and (kp[index,1,:].sum() != 0))
+                normalized_keypoints = np.array(kp)
 
-            tmp = ""
-            tmp += f + ";"
-            tmp += str(getclassnameFromName(f)) + ";"
-            tmp += str(getclassFromName(f)) + ";"
-            tmp += ",".join(map(str,list(np.asarray(normalized_keypoints[index,:,:].flatten()))))
-            DATASET_FILE.write(tmp+"\n")
+                if len(normalized_keypoints.shape) == 0:
+                    continue
+                for index in range(normalized_keypoints.shape[0]):
+                    #display
+                    min_X = min(normalized_keypoints[index,:,0])
+                    max_X = max(normalized_keypoints[index,:,0])
+                    min_Y = min(normalized_keypoints[index,:,1])
+                    max_Y = max(normalized_keypoints[index,:,1])
+                    min_Z = min(normalized_keypoints[index,:,2])
+                    max_Z = max(normalized_keypoints[index,:,2])
+                    normalized_keypoints[index,:,0] = (normalized_keypoints[index,:,0]-min_X)/(max_X-min_X)
+                    normalized_keypoints[index,:,1] = (normalized_keypoints[index,:,1]-min_Y)/(max_Y-min_Y)
+                    normalized_keypoints[index,:,2] = (normalized_keypoints[index,:,2]-min_Z)/(max_Z-min_Z)
 
-            if cv2.waitKey(1) & 0xFF == ord('q'):
-                exit()
-        except Exception as e:
-            print("******************************************")
-            print("* error in "+f)
-            print(e)
-            print("******************************************")
+                tmp = ""
+                tmp += f + ";"
+                tmp += class_data + ";"
+                tmp += str(id_class[class_data]) + ";"
+                tmp += ",".join(map(str,list(np.asarray(normalized_keypoints[index,:,:].flatten()))))
+                DATASET_FILE.write(tmp+"\n")
 
-            break
-    pbar.close()
+                if cv2.waitKey(1) & 0xFF == ord('q'):
+                    exit()
+            except Exception as e:
+                print("******************************************")
+                print("* error in "+f)
+                print(e)
+                print("******************************************")
+
+                break
+        pbar.close()
