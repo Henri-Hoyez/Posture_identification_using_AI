@@ -6,24 +6,34 @@ import os
 from sys import platform
 import argparse
 import numpy as np
-import pandas
 from tqdm import tqdm
+import time
 import datetime
 
 
 def getclassFromName(fileName):
+    if (fileName.find("boxing") != -1):
+        return 0
 
-    if (fileName.find("laying")):
+    if(fileName.find("jumping") != -1):
         return 1
-    
-    if(fileName.find("sitting")):
+
+    if(fileName.find("walking") != -1):
         return 2
-    
-    if(fileName.find("walking")):
-        return 3
 
- 
+    return None
 
+def getclassnameFromName(fileName):
+    if (fileName.find("boxing") != -1):
+        return "boxing"
+
+    if(fileName.find("jumping") != -1):
+        return "jumping"
+
+    if(fileName.find("walking") != -1):
+        return "walking"
+
+    return "unknown"
 
 
 # Import Openpose (Windows/Ubuntu/OSX)
@@ -31,13 +41,13 @@ dir_path = os.path.dirname(os.path.realpath(__file__))
 try:
     # Windows Import
     if platform == "win32":
-        # Change these variables to point to the correct folder (Release/x64 etc.) 
-        sys.path.append(dir_path + '/../../python/openpose/Release');
-        os.environ['PATH']  = os.environ['PATH'] + ';' + dir_path + '/../../x64/Release;' +  dir_path + '/../../bin;'
+        # Change these variables to point to the correct folder (Release/x64 etc.)
+        sys.path.append(dir_path + '/../../../python/openpose/Release');
+        os.environ['PATH']  = os.environ['PATH'] + ';' + dir_path + '/../../../x64/Release;' +  dir_path + '/../../../bin;'
         import pyopenpose as op
     else:
-        # Change these variables to point to the correct folder (Release/x64 etc.) 
-        sys.path.append('../../python');
+        # Change these variables to point to the correct folder (Release/x64 etc.)
+        sys.path.append('../../../python');
         # If you run `make install` (default path is `/usr/local/python` for Ubuntu), you can also access the OpenPose/python module from there. This will install OpenPose and the python library at your desired installation path. Ensure that this is in your python path in order to use it.
         # sys.path.append('/usr/local/python')
         from openpose import pyopenpose as op
@@ -54,6 +64,7 @@ args = parser.parse_known_args()
 params = dict()
 params["model_folder"] = "../../../models/"
 params["video"] = "C:\\Users\\Henri Hoyez\\Desktop\\walking.mp4"
+params["number_people_max"] = 1
 
 
 # Add others in path?
@@ -68,9 +79,7 @@ for i in range(0, len(args[1])):
         key = curr_item.replace('-','')
         if key not in params: params[key] = next_item
 
-# Construct it from system arguments
-# op.init_argv(args[1])
-# oppython = op.OpenposePython()
+
 
 # Starting OpenPose
 opWrapper = op.WrapperPython()
@@ -83,11 +92,10 @@ day =str(datetime.datetime.today().day)
 month = str(datetime.datetime.today().month)
 year = str(datetime.datetime.today().month)
 year = str(datetime.datetime.today().month)
-INPUT_PATH = "C:\\Users\\Henri Hoyez\\Desktop\\Posture_identification_using_AI\\LSTM\\Dataset\\Video"          # Video inputs
-OUTPUT_PATH = "C:\\Users\\Henri Hoyez\\Desktop\\Posture_identification_using_AI\\LSTM\\Dataset\\TrainData"     # Dataset output path
-DATASET_NAME = "dataset.csv"
+INPUT_PATH = "D:\\POSTURE\\openpose\\build\\examples\\tutorial_api_python\\Part_2\\Videos"          # Video inputs
+OUTPUT_PATH = "D:\\POSTURE\\openpose\\build\\examples\\tutorial_api_python\\Part_2"                 # Dataset output path
+DATASET_NAME = "dataset_"+datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
 
-DATASET_FILE = open(DATASET_NAME,"a+")
 
 
 test={}
@@ -97,26 +105,22 @@ TOTAL_FRAME_COUNT = 0
 count = 0
 
 
-
-
-
 files = []
-for (_, _, filenames) in os.walk(INPUT_PATH):
-    files.append(filenames)
-    
+for (root, dirs, filenames) in os.walk(INPUT_PATH):
+    for file in filenames:
+        files.append(os.path.join(root,file))
 
-
-for f in files[0]:
-    cap = cv2.VideoCapture(INPUT_PATH + "\\" + f)
-    TOTAL_FRAME_COUNT += int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-
-pbar = tqdm(total=TOTAL_FRAME_COUNT)
-
-for f in files[0]:
-    vidcap = cv2.VideoCapture(INPUT_PATH + "\\" + f)
+for f in files:
+    DATASET_FILE = open(DATASET_NAME+"_"+os.path.basename(f).replace(".","_")+".csv","a+")
+    dir_path = os.path.dirname(os.path.realpath(__file__))
+    f = os.path.relpath(f, os.path.commonprefix([f, dir_path]))
+    count += 1
+    vidcap = cv2.VideoCapture(f)
     success,image = vidcap.read()
     datum = op.Datum()
-
+    TOTAL_FRAME_COUNT = int(vidcap.get(cv2.CAP_PROP_FRAME_COUNT))
+    print("Video "+str(count)+"/"+str(len(files))+" : "+f)
+    pbar = tqdm(total=TOTAL_FRAME_COUNT)
     success = True
     while success:
         try:
@@ -124,13 +128,14 @@ for f in files[0]:
             datum.cvInputData = image
             opWrapper.emplaceAndPop([datum])
 
-            cv2.imshow("OpenPose 1.4.0 - Tutorial Python API", datum.cvOutputData)
-            count += 1
+            
             pbar.update(1)
             kp = datum.poseKeypoints
 
             normalized_keypoints = np.array(kp)
 
+            if len(normalized_keypoints.shape) == 0:
+                continue
             for index in range(normalized_keypoints.shape[0]):
                 #display
                 min_X = min(normalized_keypoints[index,:,0])
@@ -148,19 +153,20 @@ for f in files[0]:
                 isDetected = (isDetected and (kp[index,8,:].sum() != 0))
                 isDetected = (isDetected and (kp[index,1,:].sum() != 0))
 
-
-            tmp = str(getclassFromName(f))+";"
-            tmp+= ",".join(map(str,list(np.asarray(normalized_keypoints[index,:,:].flatten()))))
+            tmp = ""
+            tmp += f + ";"
+            tmp += str(getclassnameFromName(f)) + ";"
+            tmp += str(getclassFromName(f)) + ";"
+            tmp += ",".join(map(str,list(np.asarray(normalized_keypoints[index,:,:].flatten()))))
             DATASET_FILE.write(tmp+"\n")
-                
+
             if cv2.waitKey(1) & 0xFF == ord('q'):
                 exit()
-        except TypeError as e:
+        except Exception as e:
+            print("******************************************")
+            print("* error in "+f)
+            print(e)
+            print("******************************************")
+
             break
-
-    #new_data += ",".join(map(str,list(np.asarray(normalized_keypoints[index,:,:].flatten()))))
-
-    
-    
-
-    
+    pbar.close()
