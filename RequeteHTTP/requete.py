@@ -20,8 +20,12 @@ def requete(id):
 	elif(id==3):
 		channel-=1
 		suffixeUrl="tv/channel/"+str(channel)
+	elif(id==4):
+		suffixeUrl="bravia/power/on"
+	elif(id==5):
+		suffixeUrl="bravia/power/off"
 	url=radicalUrl+suffixeUrl
 	print(url)
 	request.urlopen(url).read()
 
-requete(0)
+requete(4)
